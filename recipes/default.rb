@@ -18,7 +18,8 @@ end
 user node['jmxtrans']['user']
 
 # merge stock jvm queries w/ container specific ones into single array
-servers = node['jmxtrans']['servers']
+#Made a minor change to support Chef 11
+servers = node['jmxtrans']['servers'].dup
 servers.each do |server|
   server['queries'] = node['jmxtrans']['default_queries']['jvm']
   case server['type']
@@ -28,9 +29,11 @@ servers.each do |server|
   server['queries'].flatten!
 end
 
+node.override['jmxtrans']['servers'] = servers
+
 ark "jmxtrans" do
   url node['jmxtrans']['url']
-  checksum node['jmxtrans']['checksum']
+  #checksum node['jmxtrans']['checksum']
   version "latest"
   prefix_root '/opt'
   prefix_home '/opt'
@@ -74,7 +77,7 @@ template "#{node['jmxtrans']['home']}/json/set1.json" do
   mode  "0755"
   notifies :restart, "service[jmxtrans]"
   variables(
-            :servers => servers,
+            :servers => node['jmxtrans']['servers'],
             :graphite_host => node['jmxtrans']['graphite']['host'],
             :graphite_port => node['jmxtrans']['graphite']['port'],
             :root_prefix => node['jmxtrans']['root_prefix']
@@ -83,12 +86,14 @@ end
 
 package 'gzip'
 
+=begin
 cron "compress and remove logs rotated by log4j" do
   minute "0"
   hour   "0"
   command  "find #{node['jmxtrans']['log_dir']}/ -name '*.gz' -mtime +30 -exec rm -f '{}' \\; ; \
   find #{node['jmxtrans']['log_dir']} ! -name '*.gz' -mtime +2 -exec gzip '{}' \\;"
 end
+=end
 
 execute "set correct jps alternative" do
   command "update-alternatives jps --auto jps"
